@@ -1,0 +1,135 @@
+CREATE DATABASE swiggy_analytics;
+
+USE swiggy_analytics;
+
+CREATE TABLE swiggy_restaurants (
+    ID INT,
+    Area VARCHAR(100),
+    City VARCHAR(100),
+    Restaurant VARCHAR(255),
+    Price DECIMAL(10,2),
+    Avg_Ratings DECIMAL(3,2),
+    Total_Ratings INT,
+    Food_Type TEXT,
+    Address VARCHAR(255),
+    Delivery_Time INT
+);
+
+-- Q1. Total number of restaurants
+SELECT COUNT(*) AS total_restaurants
+FROM swiggy_restaurants;
+
+-- Q2. Find all unique cities
+SELECT DISTINCT City
+FROM swiggy_restaurants
+ORDER BY City;
+
+-- Q3. Top 5 most expensive restaurants
+SELECT Restaurant, City, Price
+FROM swiggy_restaurants
+ORDER BY Price DESC
+LIMIT 5;
+
+-- Q4. Restaurants with ratings above 4
+SELECT Restaurant, Avg_Ratings
+FROM swiggy_restaurants
+WHERE Avg_Ratings > 4.0
+ORDER BY Avg_Ratings DESC;
+
+-- Q5. Average restaurant price
+SELECT ROUND(AVG(Price), 2) AS average_price
+FROM swiggy_restaurants;
+
+-- Q6. Number of restaurants in each city
+SELECT City, COUNT(*) AS total_restaurants
+FROM swiggy_restaurants
+GROUP BY City
+ORDER BY total_restaurants DESC;
+
+-- Q7. Average price by city
+SELECT City, ROUND(AVG(Price), 2) AS average_price
+FROM swiggy_restaurants
+GROUP BY City
+ORDER BY average_price DESC;
+
+-- Q8. Top 10 restaurants by total ratings
+SELECT Restaurant, City, Total_Ratings
+FROM swiggy_restaurants
+ORDER BY Total_Ratings DESC
+LIMIT 10;
+
+-- Q9. Cities with average ratings above 4
+SELECT City, ROUND(AVG(Avg_Ratings), 2) AS average_rating
+FROM swiggy_restaurants
+GROUP BY City
+HAVING AVG(Avg_Ratings) > 4.0;
+
+-- Q10. Average delivery time by city
+SELECT City, ROUND(AVG(Delivery_Time), 2) AS avg_delivery_time
+FROM swiggy_restaurants
+GROUP BY City
+ORDER BY avg_delivery_time;
+
+-- Q11. Rank restaurants by rating within each city
+SELECT
+    Restaurant,
+    City,
+    Avg_Ratings,
+    DENSE_RANK() OVER (
+        PARTITION BY City
+        ORDER BY Avg_Ratings DESC
+    ) AS rating_rank
+FROM swiggy_restaurants;
+
+-- Q12. Most expensive restaurant in each city
+WITH ranked_restaurants AS (
+    SELECT *,
+           DENSE_RANK() OVER (
+               PARTITION BY City
+               ORDER BY Price DESC
+           ) AS price_rank
+    FROM swiggy_restaurants
+)
+SELECT City, Restaurant, Price
+FROM ranked_restaurants
+WHERE price_rank = 1;
+
+-- Q13. Restaurants priced above their city's average
+WITH city_prices AS (
+    SELECT *,
+           AVG(Price) OVER (PARTITION BY City) AS city_avg_price
+    FROM swiggy_restaurants
+)
+SELECT Restaurant, City, Price,
+       ROUND(city_avg_price, 2) AS city_avg_price
+FROM city_prices
+WHERE Price > city_avg_price
+ORDER BY City, Price DESC;
+
+-- Q14. Highly rated restaurants with faster-than-average
+-- delivery times in their city
+WITH delivery_analysis AS (
+    SELECT *,
+           AVG(Delivery_Time) OVER (
+               PARTITION BY City
+           ) AS city_avg_delivery
+    FROM swiggy_restaurants
+)
+SELECT Restaurant, City, Avg_Ratings, Delivery_Time
+FROM delivery_analysis
+WHERE Avg_Ratings >= 4.0
+  AND Delivery_Time < city_avg_delivery
+ORDER BY Avg_Ratings DESC;
+
+-- Q15. Restaurant counts by price category
+SELECT
+    CASE
+        WHEN Price < 200 THEN 'Budget'
+        WHEN Price < 500 THEN 'Mid-range'
+        ELSE 'Premium'
+    END AS price_category,
+    COUNT(*) AS restaurant_count,
+    ROUND(AVG(Avg_Ratings), 2) AS average_rating
+FROM swiggy_restaurants
+GROUP BY price_category
+ORDER BY restaurant_count DESC;
